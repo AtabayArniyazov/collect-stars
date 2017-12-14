@@ -1,42 +1,22 @@
 'use strict';
-// 	class Animal {
-// 		constructor(name) {
-// 			this.name = name;
-// 		}
 
-// 		walk() {
-// 			alert("I walk: " + this.name);
-// 		}
-// 	}
-
-// 	class Rabbit extends Animal {
-// 		walk() {
-// 			super.walk();
-// 			alert("...and jump!");
-// 		}
-// 	}
-
-// 	new Rabbit("Вася").walk();
-
-// class monster {
-// 	constructor() {
-
-// 	}
-// }
-
-
-// const game = new Phaser.Game(1200, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
-const game = new Phaser.Game(1200, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update, render: render });
+const game = new Phaser.Game(1200, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+// const game = new Phaser.Game(1200, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update, render: render });
 
 
 function preload() {
 	game.load.image('sky', 'img/bgMain.png');
 	game.load.image('ground', 'img/ground.png');
-	game.load.image('star', 'img/star.png');
 	game.load.image('bullet', 'img/bullet.png');
+	game.load.spritesheet('coin', 'img/belarusianCoin_sprite.png', 68, 68);
 	game.load.atlas('dude', 'img/dude_sprite.png', 'img/dude_sprite.json');
 	game.load.atlas('zombieFemale', 'img/zombieFemale_sprite.png', 'img/zombieFemale_sprite.json');
 	game.load.atlas('zombieMale', 'img/zombieMale_sprite.png', 'img/zombieMale_sprite.json');
+	game.load.spritesheet('explosion', 'img/explode.png', 128, 128);
+	game.load.audio('coinSound', 'sounds/coin.wav');
+	game.load.audio('environment', 'sounds/ambientmain.ogg');
+
+
 }
 
 let player;
@@ -48,13 +28,19 @@ let Zombies; //class for zombie
 let zombie;
 let platforms;
 let cursors;
-let stars;
+let Coins;  //class for coins
+let coin;
+let environment;
 let score = 0;
 let scoreText;
 
 function create() {
 	game.add.tileSprite(0, 0, 10000, 600, 'sky');
 	game.world.setBounds(0, 0, 10000, 600);
+
+	environment = game.add.audio('environment');
+	environment.loopFull();
+	environment.play('environment');
 
 	game.physics.startSystem(Phaser.Physics.ARCADE);
 	cursors = game.input.keyboard.createCursorKeys();
@@ -155,41 +141,60 @@ function create() {
 		game.physics.arcade.overlap(this, player, attackZombies, null, this);
 
 	 	function attackZombies(zombie, player) {
-			// star.kill();
-			// score += 10;
-			// scoreText.text = 'Score: ' + score;
 			console.log(playerLife);
 			playerLife -= 1;
 			console.log(playerLife);
-			zombie.kill();
 		}
 
 		game.physics.arcade.overlap(this, weapon.bullets, bulletHitZombie, null, this);
     
 	    function bulletHitZombie (zombie, bullet) {
 	    	bullet.kill();
+    		weapon.bulletHit(bullet);
 	    	zombie.kill();
 	    }
-
-
-	    // game.physics.arcade.collide(this, Zombies, function (zombie, Zombies) {
-	    //     zombie.body.velocity.x *= -1.0001;
-	    // });
 	};
 
-	zombie = new Zombies(game, 500, 200, 1);
-	zombie = new Zombies(game, 200, 100, 2);
-	zombie = new Zombies(game, 800, 300, 4);
-	zombie = new Zombies(game, 1000, 400, 3);
+	for (var i = 0; i < game.world.width/100; i++) {
+		zombie = new Zombies(game, i + 100 * randomInteger(1, 50), 0);
+	}
 
-//STARS SETTING----------------------------------------------------------------------------------------------------------------------------------
-	stars = game.add.group();
-	stars.enableBody = true;
+//COINS SETTING----------------------------------------------------------------------------------------------------------------------------------
+	Coins = function createStars(game, x, y) {
+		Phaser.Sprite.call(this, game, x * 70, y, 'coin');
+		game.physics.enable(this, Phaser.Physics.ARCADE);
+		this.collideWorldBounds = true;
+	    this.enableBody = true;
+	    this.animations.add('coin');
+		this.body.gravity.y = 300;
+		this.body.bounce.y = 0.7 + Math.random() * 0.2;
+	    this.scale.setTo(0.7, 0.7);
+
+	   	this.coinSound = game.add.audio("coinSound");
+		// this.anchor.x = 0.5;
+	 //    this.anchor.y = 0.5;
+		
+		game.add.existing(this);
+	}
+
+	Coins.prototype = Object.create(Phaser.Sprite.prototype);
+	Coins.prototype.constructor = Coins;
+
+	Coins.prototype.update = function() {
+		this.animations.play('coin', 10, true, false);
+		game.physics.arcade.collide(this, platforms);
+		game.physics.arcade.overlap(this, player, collectCoins, null, this);
+
+		function collectCoins(coin, player) {
+			this.coinSound.play();
+			coin.kill();
+			score += 1;
+			scoreText.text = 'Score: ' + score + 'rubles';
+		}
+	};
 
 	for (var i = 0; i < game.world.width/70; i++) {
-		let star = stars.create(i * 70, 0, 'star');
-		star.body.gravity.y = 300;
-		star.body.bounce.y = 0.7 + Math.random() * 0.2;
+		coin = new Coins(game, i, 0);
 	}
 
 //WEAPON SETTING-----------------------------------------------------------------------------------------------------------------------------------
@@ -197,22 +202,26 @@ function create() {
     weapon = game.add.weapon(30, 'bullet');
     weapon.bulletKillType = Phaser.Weapon.KILL_CAMERA_BOUNDS;
     weapon.bulletSpeed = 500;
-    weapon.fireRate = 700;
+    weapon.fireRate = 390;
     weapon.trackSprite(player, 65, 37, true);
     fireButton = game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);
 
-    
- //    update () {
-	// 	game.physics.arcade.overlap(weapon.bullets, platforms, ballHitBrick);
-	// }
+    weapon.bulletHit = function bulletExplosion(bullet) {
+    	let explosion = game.add.sprite(bullet.x, bullet.y, 'explosion');
 
-	// function ballHitBrick(bullet,platform) {
-	// 	bullet.kill();
-	// }
+    	// let explosionSound = game.add.audio("explosionSound");
+
+		explosion.anchor.x = 0.5;
+	    explosion.anchor.y = 0.5;
+		explosion.animations.add('explosion');
+		explosion.animations.play('explosion', 25, false, true);
+
+		// explosionSound.play();
+    }
 
 
 //TEXT SETTING-----------------------------------------------------------------------------------------------------------------------------------
-	scoreText = game.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#FFF' });
+	scoreText = game.add.text(16, 16, 'Score: 0 rubles', { fontSize: '32px', fill: '#FFF' });
 
 
 //REMOVE CONTEXTMENU (right click on mouse)------------------------------------------------------------------------------------------------------
@@ -225,17 +234,14 @@ function create() {
 function update() {
 	let hitPlatform = game.physics.arcade.collide(player, platforms);
 
-	game.physics.arcade.collide(stars, platforms);
-	game.physics.arcade.overlap(player, stars, collectStar, null, this);
-	// game.physics.arcade.collide(Zombies, platforms);
-	// game.physics.arcade.overlap(zombie, player, attackZombies, null, this);
-
 	game.physics.arcade.overlap(weapon.bullets, platforms, bulletHitPlatform);
 
     function bulletHitPlatform (bullet, platform) {
     	bullet.kill();
+    	weapon.bulletHit(bullet);
     }
 
+	
 	
 	player.body.velocity.x = 0;
 
@@ -273,17 +279,13 @@ function update() {
 		if (playerWay) {
 			player.animations.play('shootLeft');
 			weapon.bulletSpeed = -500;
-			// weapon.trackSprite(player, -20, 37, true);
 			weapon.fire();
 		} else {
 			player.animations.play('shootRight');
 			weapon.bulletSpeed = 500;
-			// weapon.trackSprite(player, 65, 37, true);
 			weapon.fire();
 		}
 
-
-		
 	} else {
 
 		if (!player.body.touching.down && !hitPlatform) {
@@ -310,31 +312,14 @@ function update() {
 }
 
 
-function collectStar(player, star) {
-	star.kill();
-	score += 10;
-	scoreText.text = 'Score: ' + score;
-}
 
 
-// function attackZombies(zombies, player) {
-// 	// star.kill();
-// 	// score += 10;
-// 	// scoreText.text = 'Score: ' + score;
-// 	console.log(playerLife);
-// 	playerLife -= 1;
-// 	console.log(playerLife);
+
+// // -----------------------------
+// function render() {
+
+//     game.debug.cameraInfo(game.camera, 32, 32);
+//     game.debug.spriteCoords(player, 800, 32);
+//     weapon.debug(32, 300);
 // }
-
-
-
-
-
-// -----------------------------
-function render() {
-
-    game.debug.cameraInfo(game.camera, 32, 32);
-    game.debug.spriteCoords(player, 800, 32);
-    weapon.debug(32, 300);
-}
-// -----------------------------
+// // -----------------------------
