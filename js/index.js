@@ -39,7 +39,7 @@ function create() {
 	game.world.setBounds(0, 0, 10000, 600);
 
 	environment = game.add.audio('environment');
-// 	environment.loopFull();
+	environment.loopFull();
 	environment.play('environment');
 
 	game.physics.startSystem(Phaser.Physics.ARCADE);
